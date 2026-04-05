@@ -1,0 +1,2 @@
+# Early-Stage-Parkinson-s-Disease-Detection-Employing-a-Multi-Modal-CNN-Approach
+The proposed approach focuses on leveraging a multi-modal Convolutional Neural Network (CNN) to analyze different types of biomedical data, such as MRI and other relevant signals, in order to capture both structural and functional changes in the brain. By improving feature extraction and combining multiple data sources.
