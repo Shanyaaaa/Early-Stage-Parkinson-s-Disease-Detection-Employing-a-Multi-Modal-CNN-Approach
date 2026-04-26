@@ -1,223 +1,223 @@
 # import streamlit as st
 # import pandas as pd
-# import numpy as np
 # import joblib
 
-# # ---------------- PAGE CONFIG ----------------
+# # ---------------- CONFIG ----------------
 # st.set_page_config(page_title="Parkinson Detection", layout="wide")
 
-# # ---------------- CUSTOM CSS ----------------
+# # ---------------- SESSION ----------------
+# if "page" not in st.session_state:
+#     st.session_state.page = "home"
+
+# def go_home():
+#     st.session_state.page = "home"
+
+# def go_app():
+#     st.session_state.page = "app"
+
+# # ---------------- STYLE ----------------
 # st.markdown("""
 # <style>
 # .stApp {
 #     background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
 #     color: white;
 # }
-
-# .title {
+# .hero {
 #     text-align: center;
-#     font-size: 42px;
-#     font-weight: bold;
-#     margin-bottom: 10px;
+#     padding: 120px 20px;
 # }
-
 # .card {
 #     background: rgba(255,255,255,0.08);
 #     padding: 20px;
 #     border-radius: 15px;
-#     box-shadow: 0px 4px 20px rgba(0,0,0,0.3);
-# }
-
-# .healthy {
-#     color: #00ff9f;
-#     font-weight: bold;
-# }
-
-# .parkinson {
-#     color: #ff4b4b;
-#     font-weight: bold;
+#     margin-top: 20px;
 # }
 # </style>
 # """, unsafe_allow_html=True)
 
-# # ---------------- TITLE ----------------
-# st.markdown("<div class='title'>🧠 Parkinson Detection System</div>", unsafe_allow_html=True)
-# st.markdown("---")
+# # ================= LANDING =================
+# if st.session_state.page == "home":
 
-# # ---------------- LOAD MODELS ----------------
-# clf = joblib.load("parkinson_classifier.pkl")
-# reg = joblib.load("parkinson_stage_model.pkl")
-# features = joblib.load("features.pkl")
+#     st.markdown("""
+#     <div class="hero">
+#         <h1>🧠 Parkinson Detection System</h1>
+#         <p>AI + Clinical Hybrid Model for Stage Prediction</p>
+#     </div>
+#     """, unsafe_allow_html=True)
 
-# # ---------------- LAYOUT ----------------
-# col1, col2 = st.columns([2, 1])
+#     if st.button("🚀 Start"):
+#         go_app()
 
-# # ================= LEFT SIDE =================
-# with col1:
+#     st.stop()
 
-#     # ===== CSV UPLOAD =====
-#     st.markdown("### 📂 Upload Patient Dataset")
-#     uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
+# # ================= MAIN =================
+# if st.session_state.page == "app":
 
-#     if uploaded_file:
-#         df = pd.read_csv(uploaded_file, header=1)
+#     if st.button("⬅ Back"):
+#         go_home()
+
+#     st.title("🧪 Parkinson Prediction System")
+
+#     # ---------------- LOAD MODEL ----------------
+#     try:
+#         model = joblib.load("parkinson_model.pkl")
+#         features = joblib.load("features.pkl")
+#     except:
+#         st.error("❌ Run train_model.py first")
+#         st.stop()
+
+#     # ================= DATASET =================
+#     st.markdown("### 📂 Bulk Dataset Prediction")
+
+#     file = st.file_uploader("Upload CSV", type=["csv"])
+
+#     if file is not None:
+#         df = pd.read_csv(file, header=1)
 #         df.columns = df.columns.str.strip()
 
-#         st.markdown("### 🔍 Data Preview")
+#         st.write("### 🔍 Dataset Preview")
 #         st.dataframe(df.head())
 
-#         df = df.select_dtypes(include=['number'])
-#         df = df.reindex(columns=features, fill_value=0)
+#         # Rename
+#         df = df.rename(columns={
+#             "Age (years)": "Age",
+#             "UPDRS III total (-)": "UPDRS III",
+#             "Duration of disease from first symptoms (years)": "Disease Duration",
+#             "18. Speech": "Speech Score",
+#             "19. Facial Expression": "Facial Expression",
+#             "20. Tremor at Rest - head": "Tremor (Head)",
+#             "Levodopa equivalent (mg/day)": "Levodopa (mg/day)"
+#         })
 
-#         if st.button("🚀 Run Prediction"):
+#         df_model = df[features].replace("-", pd.NA)
+#         df_model = df_model.apply(pd.to_numeric, errors='coerce').fillna(0)
 
-#             pred_status = clf.predict(df)
-#             pred_stage = reg.predict(df)
+#         if st.button("📊 Predict Dataset"):
 
-#             st.markdown("## 📊 Results")
+#             stages = model.predict(df_model)
 
-#             for i in range(len(pred_status)):
+#             results = []
 
-#                 if pred_status[i] == 1:
-#                     result = "Parkinson's"
-#                     css_class = "parkinson"
-#                     stage = round(pred_stage[i], 2)
+#             for i in range(len(df)):
+#                 stage = stages[i]
+#                 updrs_val = df_model.iloc[i]["UPDRS III"]
 
-#                     if stage <= 2:
-#                         severity = "Mild"
-#                         progress = 30
-#                     elif stage <= 3:
-#                         severity = "Moderate"
-#                         progress = 60
-#                     else:
-#                         severity = "Severe"
-#                         progress = 90
-#                 else:
-#                     result = "Healthy"
-#                     css_class = "healthy"
-#                     stage = 0
+#                 # 🔥 HYBRID CORRECTION
+#                 if updrs_val > 50:
+#                     stage = max(stage, 3.5)
+#                 elif updrs_val > 30:
+#                     stage = max(stage, 2.5)
+
+#                 # Classification
+#                 if stage < 1:
+#                     status = "Healthy"
 #                     severity = "None"
-#                     progress = 10
-
-#                 st.markdown(f"""
-#                 <div class="card">
-#                     <h4>Patient {i+1}</h4>
-#                     <p>Status: <span class="{css_class}">{result}</span></p>
-#                     <p>Stage: {stage}</p>
-#                     <p>Severity: {severity}</p>
-#                 </div>
-#                 """, unsafe_allow_html=True)
-
-#                 st.progress(progress)
-
-#     # ===== MANUAL INPUT =====
-#     st.markdown("---")
-#     st.markdown("## 🧑‍⚕️ Manual Patient Entry")
-
-#     with st.container():
-
-#         colA, colB = st.columns(2)
-
-#         with colA:
-#             age = st.number_input("Age (years)", 0, 120, 60)
-#             duration = st.number_input("Disease Duration (years)", 0.0, 50.0, 1.0)
-#             levodopa = st.number_input("Levodopa (mg/day)", 0.0, 2000.0, 0.0)
-#             clonazepam = st.number_input("Clonazepam (mg/day)", 0.0, 10.0, 0.0)
-
-#         with colB:
-#             updrs = st.number_input("UPDRS III Score", 0.0, 200.0, 10.0)
-#             speech = st.number_input("Speech Score", 0.0, 10.0, 0.0)
-#             facial = st.number_input("Facial Expression", 0.0, 10.0, 0.0)
-#             tremor = st.number_input("Tremor Score", 0.0, 10.0, 0.0)
-
-#         if st.button("🧠 Predict for Single Patient"):
-
-#             input_dict = {
-#                 "Age (years)": age,
-#                 "Duration of disease from first symptoms (years)": duration,
-#                 "Levodopa equivalent (mg/day)": levodopa,
-#                 "Clonazepam (mg/day)": clonazepam,
-#                 "UPDRS III total (-)": updrs,
-#                 "18. Speech": speech,
-#                 "19. Facial Expression": facial,
-#                 "20. Tremor at Rest - head": tremor
-#             }
-
-#             input_df = pd.DataFrame([input_dict])
-#             input_df = input_df.select_dtypes(include=['number'])
-#             input_df = input_df.reindex(columns=features, fill_value=0)
-
-#             pred_status = clf.predict(input_df)[0]
-#             pred_stage = reg.predict(input_df)[0]
-
-#             if pred_status == 1:
-#                 result = "Parkinson's"
-#                 css_class = "parkinson"
-#                 stage = round(pred_stage, 2)
-
-#                 if stage <= 2:
-#                     severity = "Mild"
-#                     progress = 30
-#                 elif stage <= 3:
-#                     severity = "Moderate"
-#                     progress = 60
+#                 elif stage < 2:
+#                     status = "Parkinson's"
+#                     severity = "Stage 1 (Mild)"
+#                 elif stage < 3:
+#                     status = "Parkinson's"
+#                     severity = "Stage 2 (Moderate)"
+#                 elif stage < 4:
+#                     status = "Parkinson's"
+#                     severity = "Stage 3 (Advanced)"
 #                 else:
-#                     severity = "Severe"
-#                     progress = 90
-#             else:
-#                 result = "Healthy"
-#                 css_class = "healthy"
-#                 stage = 0
-#                 severity = "None"
-#                 progress = 10
+#                     status = "Parkinson's"
+#                     severity = "Stage 4-5 (Severe)"
 
-#             st.markdown(f"""
-#             <div class="card">
-#                 <h3>🧾 Prediction Result</h3>
-#                 <p>Status: <span class="{css_class}">{result}</span></p>
-#                 <p>Stage: {stage}</p>
-#                 <p>Severity: {severity}</p>
-#             </div>
-#             """, unsafe_allow_html=True)
+#                 results.append({
+#                     "Patient": i+1,
+#                     "Age": df_model.iloc[i]["Age"],
+#                     "UPDRS III": updrs_val,
+#                     "Stage": round(stage, 2),
+#                     "Status": status,
+#                     "Severity": severity
+#                 })
 
-#             st.progress(progress)
+#             result_df = pd.DataFrame(results)
 
-# # ================= RIGHT SIDE =================
-# with col2:
+#             st.write("### 📈 Results")
+#             st.dataframe(result_df)
+#             st.bar_chart(result_df["Stage"])
 
-#     st.markdown("### 🧠 About Model")
-#     st.markdown("""
-#     <div class="card">
-#     ✔ Detects Parkinson’s Disease  
-#     ✔ Predicts Stage (Hoehn & Yahr)  
-#     ✔ Machine Learning Model  
+#     # ================= INDIVIDUAL =================
+#     st.markdown("---")
+#     st.markdown("### 🧑‍⚕️ Individual Patient Prediction")
 
-#     <br>
+#     col1, col2 = st.columns(2)
 
-#     <b>Severity Levels:</b><br>
-#     🟢 Mild (0–2)<br>
-#     🟡 Moderate (2–3)<br>
-#     🔴 Severe (3+)
-#     </div>
-#     """, unsafe_allow_html=True)
+#     with col1:
+#         age = st.number_input("Age", 0, 120, 30)
+#         duration = st.number_input("Disease Duration", 0.0, 50.0, 0.0)
+#         levodopa = st.number_input("Levodopa", 0.0, 2000.0, 0.0)
 
-#     st.markdown("### ⚙️ Instructions")
-#     st.markdown("""
-#     <div class="card">
-#     1. Upload CSV file  
-#     2. Click Predict  
-#     3. Or enter patient manually  
-#     4. View results instantly  
-#     </div>
-#     """, unsafe_allow_html=True)
+#     with col2:
+#         updrs = st.number_input("UPDRS III", 0.0, 200.0, 0.0)
+#         speech = st.number_input("Speech Score", 0.0, 10.0, 0.0)
+#         facial = st.number_input("Facial Expression", 0.0, 10.0, 0.0)
+#         tremor = st.number_input("Tremor", 0.0, 10.0, 0.0)
 
+#     if st.button("🧠 Predict"):
+
+#         data = pd.DataFrame([{
+#             "Age": age,
+#             "UPDRS III": updrs,
+#             "Disease Duration": duration,
+#             "Speech Score": speech,
+#             "Facial Expression": facial,
+#             "Tremor (Head)": tremor,
+#             "Levodopa (mg/day)": levodopa
+#         }])
+
+#         stage = model.predict(data)[0]
+
+#         # 🔥 HYBRID CORRECTION
+#         if updrs > 50:
+#             stage = max(stage, 3.5)
+#         elif updrs > 30:
+#             stage = max(stage, 2.5)
+
+#         # Classification
+#         if stage < 1:
+#             status = "Healthy"
+#             severity = "None"
+#         elif stage < 2:
+#             status = "Parkinson's"
+#             severity = "Stage 1 (Mild)"
+#         elif stage < 3:
+#             status = "Parkinson's"
+#             severity = "Stage 2 (Moderate)"
+#         elif stage < 4:
+#             status = "Parkinson's"
+#             severity = "Stage 3 (Advanced)"
+#         else:
+#             status = "Parkinson's"
+#             severity = "Stage 4-5 (Severe)"
+
+#         st.markdown(f"""
+#         <div class="card">
+#         <h3>Result</h3>
+#         <b>Status:</b> {status}<br>
+#         <b>Stage:</b> {round(stage,2)}<br>
+#         <b>Severity:</b> {severity}
+#         </div>
+#         """, unsafe_allow_html=True)
 import streamlit as st
 import pandas as pd
-import numpy as np
 import joblib
 
 # ---------------- CONFIG ----------------
-st.set_page_config(page_title="Parkinson Detection", layout="wide")
+st.set_page_config(page_title="Parkinson AI", layout="wide")
+
+# ---------------- SESSION ----------------
+if "page" not in st.session_state:
+    st.session_state.page = "home"
+
+def go_home():
+    st.session_state.page = "home"
+
+def go_app():
+    st.session_state.page = "app"
 
 # ---------------- STYLE ----------------
 st.markdown("""
@@ -226,152 +226,253 @@ st.markdown("""
     background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
     color: white;
 }
-.title {
-    text-align: center;
-    font-size: 40px;
-    font-weight: bold;
+
+/* HERO (centered, compact) */
+.hero-wrap {
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding: 60px 20px 30px 20px;
 }
+.hero {
+    text-align:center;
+    max-width: 900px;
+}
+.title {
+    font-size: 52px;
+    font-weight: 800;
+    background: linear-gradient(90deg, #00c6ff, #0072ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.subtitle {
+    font-size: 18px;
+    margin-top: 10px;
+    margin-bottom: 20px;
+    color: #dcdcdc;
+}
+
+/* BUTTON */
+.stButton>button {
+    background: linear-gradient(135deg, #ff512f, #dd2476);
+    color: white;
+    border-radius: 28px;
+    font-size: 16px;
+    padding: 10px 22px;
+    transition: 0.25s;
+}
+.stButton>button:hover {
+    transform: scale(1.05);
+    box-shadow: 0px 0px 16px rgba(255,80,120,0.5);
+}
+
+/* CARD */
 .card {
     background: rgba(255,255,255,0.08);
-    padding: 20px;
-    border-radius: 15px;
+    padding: 18px;
+    border-radius: 12px;
+    margin-top: 10px;
 }
-.healthy { color: #00ff9f; }
-.parkinson { color: #ff4b4b; }
+
+/* FEATURE CARDS */
+.feature-card {
+    background: rgba(255,255,255,0.08);
+    padding: 18px;
+    border-radius: 12px;
+    text-align:center;
+}
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<div class='title'>🧠 Parkinson Detection System</div>", unsafe_allow_html=True)
-st.markdown("---")
+# ================= LANDING =================
+if st.session_state.page == "home":
 
-# ---------------- LOAD ----------------
-clf = joblib.load("parkinson_classifier.pkl")
-reg = joblib.load("parkinson_stage_model.pkl")
-features = joblib.load("features.pkl")
-
-# ---------------- LAYOUT ----------------
-col1, col2 = st.columns([2,1])
-
-# ================= LEFT =================
-with col1:
-
-    # ===== CSV =====
-    st.subheader("📂 Upload Dataset")
-    file = st.file_uploader("Upload CSV", type=["csv"])
-
-    if file:
-        df = pd.read_csv(file, header=1)
-        df.columns = df.columns.str.strip()
-
-        st.dataframe(df.head())
-
-        df = df.select_dtypes(include=['number'])
-        df = df.reindex(columns=features, fill_value=0)
-
-        if st.button("Predict Dataset"):
-            pred = clf.predict(df)
-            stage = reg.predict(df)
-
-            for i in range(len(pred)):
-                if pred[i] == 1:
-                    result = "Parkinson's"
-                    css = "parkinson"
-                    stg = round(stage[i],2)
-
-                    if stg <= 2:
-                        sev = "Mild"
-                    elif stg <= 3:
-                        sev = "Moderate"
-                    else:
-                        sev = "Severe"
-                else:
-                    result = "Healthy"
-                    css = "healthy"
-                    stg = 0
-                    sev = "None"
-
-                st.markdown(f"""
-                <div class="card">
-                <b>Patient {i+1}</b><br>
-                Status: <span class="{css}">{result}</span><br>
-                Stage: {stg}<br>
-                Severity: {sev}
-                </div>
-                """, unsafe_allow_html=True)
-
-    # ===== MANUAL INPUT =====
-    st.markdown("---")
-    st.subheader("🧑‍⚕️ Manual Patient Entry (Important Fields Only)")
-
-    colA, colB = st.columns(2)
-
-    with colA:
-        age = st.number_input("Age", 0, 120, 60)
-        duration = st.number_input("Disease Duration", 0.0, 50.0, 1.0)
-        levodopa = st.number_input("Levodopa (mg/day)", 0.0, 2000.0, 0.0)
-
-    with colB:
-        updrs = st.number_input("UPDRS III", 0.0, 200.0, 10.0)
-        speech = st.number_input("Speech Score", 0.0, 10.0, 0.0)
-        facial = st.number_input("Facial Expression", 0.0, 10.0, 0.0)
-        tremor = st.number_input("Tremor (Head)", 0.0, 10.0, 0.0)
-
-    if st.button("🧠 Predict Single Patient"):
-
-        data = {
-            "Age (years)": age,
-            "Duration of disease from first symptoms (years)": duration,
-            "Levodopa equivalent (mg/day)": levodopa,
-            "UPDRS III total (-)": updrs,
-            "18. Speech": speech,
-            "19. Facial Expression": facial,
-            "20. Tremor at Rest - head": tremor
-        }
-
-        input_df = pd.DataFrame([data])
-        input_df = input_df.reindex(columns=features, fill_value=0)
-
-        pred = clf.predict(input_df)[0]
-        stage = reg.predict(input_df)[0]
-
-        if pred == 1:
-            result = "Parkinson's"
-            css = "parkinson"
-            stg = round(stage,2)
-
-            if stg <= 2:
-                sev = "Mild"
-            elif stg <= 3:
-                sev = "Moderate"
-            else:
-                sev = "Severe"
-        else:
-            result = "Healthy"
-            css = "healthy"
-            stg = 0
-            sev = "None"
-
-        st.markdown(f"""
-        <div class="card">
-        <h3>Result</h3>
-        Status: <span class="{css}">{result}</span><br>
-        Stage: {stg}<br>
-        Severity: {sev}
-        </div>
-        """, unsafe_allow_html=True)
-
-# ================= RIGHT =================
-with col2:
-    st.subheader("ℹ️ Info")
     st.markdown("""
-    <div class="card">
-    ✔ Uses ML model  
-    ✔ Predicts Parkinson’s  
-    ✔ Estimates severity  
-
-    <br>
-    🟢 Mild (0–2)  
-    🟡 Moderate (2–3)  
-    🔴 Severe (3+)  
+    <div class="hero-wrap">
+        <div class="hero">
+            <div class="title">🧠 Parkinson AI System</div>
+            <div class="subtitle">
+                Predict disease stage using clinical indicators in seconds
+            </div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
+
+    # Centered CTA
+    c1, c2, c3 = st.columns([1,2,1])
+    with c2:
+        if st.button("🚀 Start Analysis", use_container_width=True):
+            go_app()
+
+    st.caption("AI-powered clinical support system • Multi-stage (0–5) prediction")
+
+    # Features row
+    st.markdown("### 🚀 Key Features")
+    f1, f2, f3 = st.columns(3)
+    with f1:
+        st.markdown('<div class="feature-card"><h4>⚡ Fast</h4>Instant predictions</div>', unsafe_allow_html=True)
+    with f2:
+        st.markdown('<div class="feature-card"><h4>🧠 AI + Clinical</h4>Hybrid logic</div>', unsafe_allow_html=True)
+    with f3:
+        st.markdown('<div class="feature-card"><h4>📊 Insightful</h4>Charts & explanations</div>', unsafe_allow_html=True)
+
+    st.stop()
+
+# ================= MAIN =================
+if st.session_state.page == "app":
+
+    if st.button("⬅ Back"):
+        go_home()
+
+    st.title("🧪 Parkinson Prediction Dashboard")
+    st.caption("Analyze individual patients or entire datasets")
+
+    # ---------------- LOAD MODEL ----------------
+    try:
+        model = joblib.load("parkinson_model.pkl")
+        features = joblib.load("features.pkl")
+    except:
+        st.error("❌ Model files not found. Run train_model.py first.")
+        st.stop()
+
+    # ---------------- TABS ----------------
+    tab1, tab2 = st.tabs(["🧑 Individual Prediction", "📂 Dataset Analysis"])
+
+    # ================= INDIVIDUAL =================
+    with tab1:
+        st.subheader("Patient Input")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            age = st.number_input("Age", 0, 120, 30)
+            duration = st.number_input("Disease Duration", 0.0, 50.0, 0.0)
+            levodopa = st.number_input("Levodopa (mg/day)", 0.0, 2000.0, 0.0)
+        with col2:
+            updrs = st.number_input("UPDRS III", 0.0, 200.0, 0.0)
+            speech = st.number_input("Speech Score", 0.0, 10.0, 0.0)
+            facial = st.number_input("Facial Expression", 0.0, 10.0, 0.0)
+            tremor = st.number_input("Tremor (Head)", 0.0, 10.0, 0.0)
+
+        if st.button("🧠 Predict"):
+            data = pd.DataFrame([{
+                "Age": age,
+                "UPDRS III": updrs,
+                "Disease Duration": duration,
+                "Speech Score": speech,
+                "Facial Expression": facial,
+                "Tremor (Head)": tremor,
+                "Levodopa (mg/day)": levodopa
+            }])
+
+            # ⏳ Loading
+            with st.spinner("Analyzing patient data..."):
+                stage = model.predict(data)[0]
+
+            # 🔧 Hybrid correction
+            if updrs > 50:
+                stage = max(stage, 3.5)
+            elif updrs > 30:
+                stage = max(stage, 2.5)
+
+            # 🎨 Color + severity
+            if stage < 1:
+                severity = "Healthy"
+                color = "#00ff9f"
+            elif stage < 2:
+                severity = "Stage 1 (Mild)"
+                color = "#9be564"
+            elif stage < 3:
+                severity = "Stage 2 (Moderate)"
+                color = "#ffd166"
+            elif stage < 4:
+                severity = "Stage 3 (Advanced)"
+                color = "#ff8c42"
+            else:
+                severity = "Stage 4–5 (Severe)"
+                color = "#ff4b4b"
+
+            # 📊 Hierarchy
+            m1, m2 = st.columns(2)
+            with m1:
+                st.metric("Predicted Stage", round(stage, 2))
+            with m2:
+                st.metric("Severity", severity)
+
+            st.markdown(f"""
+            <div class="card">
+                <h3 style="color:{color}; margin:0;">{severity}</h3>
+                <p style="margin:6px 0 0 0;">Stage ≈ {round(stage,2)}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # 📊 Visual insight
+            st.subheader("Stage Visualization")
+            chart_df = pd.DataFrame({"Stage":[stage]})
+            st.bar_chart(chart_df)
+
+            # 🧠 Dynamic explainability
+            st.subheader("🔍 What Influenced Prediction")
+            influences = []
+            if updrs > 30:
+                influences.append("High UPDRS III indicates significant motor impairment")
+            if tremor > 2:
+                influences.append("Tremor contributes to progression")
+            if facial > 2:
+                influences.append("Reduced facial expression suggests motor symptoms")
+            if speech > 2:
+                influences.append("Speech impairment is a Parkinson’s indicator")
+            if duration > 5:
+                influences.append("Long disease duration increases stage severity")
+            if levodopa > 500:
+                influences.append("Higher medication dosage suggests advanced condition")
+
+            if not influences:
+                influences.append("All indicators are low → likely healthy or early-stage")
+
+            for item in influences:
+                st.write("•", item)
+
+            st.caption("Input summary")
+            st.json(data.to_dict())
+
+    # ================= DATASET =================
+    with tab2:
+        st.subheader("Upload Dataset")
+        file = st.file_uploader("Upload CSV", type=["csv"])
+
+        if file:
+            df = pd.read_csv(file, header=1)
+            df.columns = df.columns.str.strip()
+            st.write("Preview")
+            st.write(df.head())
+
+            # Rename to match training
+            df = df.rename(columns={
+                "Age (years)": "Age",
+                "UPDRS III total (-)": "UPDRS III",
+                "Duration of disease from first symptoms (years)": "Disease Duration",
+                "18. Speech": "Speech Score",
+                "19. Facial Expression": "Facial Expression",
+                "20. Tremor at Rest - head": "Tremor (Head)",
+                "Levodopa equivalent (mg/day)": "Levodopa (mg/day)"
+            })
+
+            # Clean
+            df_model = df[features].replace("-", pd.NA)
+            df_model = df_model.apply(pd.to_numeric, errors='coerce').fillna(0)
+
+            if st.button("📊 Predict Dataset"):
+                with st.spinner("Processing dataset..."):
+                    stages = model.predict(df_model)
+
+                result_df = pd.DataFrame({
+                    "Patient": range(1, len(stages)+1),
+                    "Age": df_model["Age"],
+                    "UPDRS III": df_model["UPDRS III"],
+                    "Stage": stages.round(2)
+                })
+
+                st.dataframe(result_df)
+
+                st.subheader("Stage Distribution")
+                st.bar_chart(result_df["Stage"])

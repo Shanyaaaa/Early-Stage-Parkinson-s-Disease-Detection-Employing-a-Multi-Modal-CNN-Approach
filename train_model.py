@@ -1,55 +1,58 @@
 import pandas as pd
 import joblib
-
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor
 
 # ---------------- LOAD DATA ----------------
 df = pd.read_csv("parkinsons_data.csv", header=1)
-
-# Clean column names
 df.columns = df.columns.str.strip()
 
-print("Columns Loaded:", df.columns.tolist())
+# ---------------- RENAME COLUMNS ----------------
+df = df.rename(columns={
+    "Age (years)": "Age",
+    "UPDRS III total (-)": "UPDRS III",
+    "Duration of disease from first symptoms (years)": "Disease Duration",
+    "18. Speech": "Speech Score",
+    "19. Facial Expression": "Facial Expression",
+    "20. Tremor at Rest - head": "Tremor (Head)",
+    "Levodopa equivalent (mg/day)": "Levodopa (mg/day)"
+})
 
-# ---------------- FIND TARGET COLUMN ----------------
-target_col = [col for col in df.columns if "Hoehn" in col][0]
+# ---------------- TARGET ----------------
+target_col = "Hoehn & Yahr scale (-)"
 
-print("✅ Using target column:", target_col)
-
-# ---------------- CLEAN TARGET ----------------
 df[target_col] = pd.to_numeric(df[target_col], errors='coerce')
 
-# Remove rows without stage (HC & RBD)
-df = df.dropna(subset=[target_col])
-
-# ---------------- CREATE LABELS ----------------
-df["status"] = df[target_col].apply(lambda x: 1 if x > 0 else 0)
+# ✅ IMPORTANT → include healthy patients
+df[target_col] = df[target_col].fillna(0)
 
 # ---------------- FEATURES ----------------
-X = df.drop([target_col, "status"], axis=1)
+features = [
+    "Age",
+    "UPDRS III",
+    "Disease Duration",
+    "Speech Score",
+    "Facial Expression",
+    "Tremor (Head)",
+    "Levodopa (mg/day)"
+]
 
-# Keep only numeric columns
-X = X.select_dtypes(include=['number'])
+# Clean feature values
+X = df[features].replace("-", pd.NA)
+X = X.apply(pd.to_numeric, errors='coerce').fillna(0)
 
-y_status = df["status"]
-y_stage = df[target_col]
+y = df[target_col]
 
-# ---------------- SPLIT ----------------
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y_status, test_size=0.2, random_state=42
+# ---------------- MODEL ----------------
+model = RandomForestRegressor(
+    n_estimators=300,
+    max_depth=10,
+    random_state=42
 )
 
-# ---------------- MODELS ----------------
-clf = RandomForestClassifier(n_estimators=200, random_state=42)
-clf.fit(X_train, y_train)
-
-reg = RandomForestRegressor(n_estimators=200, random_state=42)
-reg.fit(X, y_stage)
+model.fit(X, y)
 
 # ---------------- SAVE ----------------
-joblib.dump(clf, "parkinson_classifier.pkl")
-joblib.dump(reg, "parkinson_stage_model.pkl")
-joblib.dump(X.columns.tolist(), "features.pkl")  # important!
+joblib.dump(model, "parkinson_model.pkl")
+joblib.dump(features, "features.pkl")
 
-print("\n✅ Models trained successfully!")
+print("✅ Model trained successfully (Stages 0–5)")
