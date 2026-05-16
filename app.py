@@ -423,9 +423,8 @@ if st.session_state.result:
         <div class="res-conf">
             Confidence: {debug['max_prob']*100:.1f}%
             {' ⚠️ Low confidence — collect more data' if not debug['confident'] else ''}
-            ; Voice: {'✅ Used' if debug['voice_used'] else '⊘ Skipped'}
-        </div>
-    </div>
+             Voice: {'✅ Used' if debug['voice_used'] else '⊘ Skipped'}
+        
     """, unsafe_allow_html=True)
 
     lc, rc = st.columns([1, 1], gap="large")
